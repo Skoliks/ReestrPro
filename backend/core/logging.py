@@ -5,7 +5,7 @@ def setup_logger():
         level=logging.INFO,
         filemode="w",
         filename="py_log.log",
-        format="%(asktime)s %(levelname)s %(message)s" 
+        format="%(asctime)s %(levelname)s %(message)s" 
     )
 
 def get_logger(name: str) -> logging.Logger:
