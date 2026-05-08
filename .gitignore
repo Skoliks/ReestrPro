@@ -56,11 +56,16 @@ ENV/
 *.swo
 *~
 
-# OS files
-.DS_Store
-Thumbs.db
-
+# Big downloaded data
 data/raw/
 data/extracted/
+
+# Archives
 *.7z
 *.zip
+*.rar
+
+# But keep small sample CSV files
+!data/samples/
+!data/samples/*.csv
+

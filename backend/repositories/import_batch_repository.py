@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from backend.db.models.import_batch import ImportBatch
+from backend.db.models import ImportBatch
 
 
 class ImportBatchRepository:

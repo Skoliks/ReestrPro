@@ -8,7 +8,7 @@ from backend.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-router = APIRouter(prefix="/health", tags=["verification"])
+router = APIRouter(prefix="/health", tags=["health"])
 
 @router.get("")
 def health():
