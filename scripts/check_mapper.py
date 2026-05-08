@@ -3,13 +3,13 @@ import csv
 
 from backend.external.csv_mapper import map_row_to_document_data
 
-file_path = Path("backend/data/samples/certificates_sample.csv")
+file_path = Path("backend/data/samples/declaration_sample.csv")
 
 with file_path.open("r", encoding="utf-8-sig", newline="") as file:
     reader = csv.DictReader(file)
     row = next(reader)
 
-data = map_row_to_document_data(row, "certificate")
+data = map_row_to_document_data(row, "declaration")
 
 print("document_number:", data["document_number"])
 print("status:", data["status"])
@@ -21,3 +21,5 @@ print("product_full_name:", data["product_full_name"])
 print()
 print("SEARCH TEXT:")
 print(data["search_text"])
+
+print(data.keys())
