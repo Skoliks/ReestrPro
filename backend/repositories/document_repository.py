@@ -65,3 +65,12 @@ class DocumentRepository:
         )
 
         return items, total
+    
+    def get_documents_for_embeddings(self, limit: int = 10):
+        return (
+            self.db.query(RegistryDocument)
+            .filter(RegistryDocument.search_text.isnot(None))
+            .order_by(RegistryDocument.id.asc())
+            .limit(limit)
+            .all()
+        )

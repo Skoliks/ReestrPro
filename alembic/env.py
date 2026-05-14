@@ -4,6 +4,7 @@ from backend.db.base import Base
 
 from backend.db.models.import_batch import ImportBatch
 from backend.db.models.registry_document import RegistryDocument
+from backend.db.models.document_embedding import DocumentEmbedding
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool

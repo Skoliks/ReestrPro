@@ -81,3 +81,8 @@ class RegistryDocument(Base):
     )
     
     import_batch = relationship("ImportBatch", back_populates="documents")
+    embeddings = relationship(
+    "DocumentEmbedding",
+    back_populates="document",
+    cascade="all, delete-orphan",
+)
