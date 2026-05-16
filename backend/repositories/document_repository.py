@@ -74,3 +74,20 @@ class DocumentRepository:
             .limit(limit)
             .all()
         )
+        
+    def get_documents_for_embeddings_by_batch(
+    self,
+    import_batch_id: int,
+    limit: int | None = None,
+    ):
+        query = (
+            self.db.query(RegistryDocument)
+            .filter(RegistryDocument.import_batch_id == import_batch_id)
+            .filter(RegistryDocument.search_text.isnot(None))
+            .order_by(RegistryDocument.id.asc())
+        )
+
+        if limit is not None:
+            query = query.limit(limit)
+
+        return query.all()

@@ -214,3 +214,11 @@ python scripts/import_data.py
 
 ```
 ```
+
+docker compose up -d
+alembic upgrade head
+
+python -m scripts.import_archive --archive backend/data/samples/archives/declaration_sample.7z --type declaration --limit 1
+python -m scripts.import_archive --archive backend/data/samples/archives/certificates_sample.7z --type certificate --limit 1
+
+uvicorn main:app --reload

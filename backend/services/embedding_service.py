@@ -56,3 +56,42 @@ class EmbeddingService:
             model_name=self.embedding_client.model_name,
             limit=limit,
         )
+        
+    def generate_for_import_batch(
+    self,
+    import_batch_id: int,
+    limit: int | None = None,
+    ) -> dict[str, int]:
+        documents = self.document_repository.get_documents_for_embeddings_by_batch(
+            import_batch_id=import_batch_id,
+            limit=limit,
+        )
+
+        created_count = 0
+        skipped_count = 0
+
+        for document in documents:
+            if self.embedding_repository.exists_for_document(
+                document_id=document.id,
+                model_name=self.embedding_client.model_name,
+            ):
+                skipped_count += 1
+                continue
+
+            embedding_vector = self.embedding_client.embed_text(document.search_text)
+
+            embedding = DocumentEmbedding(
+                document_id=document.id,
+                embedding=embedding_vector,
+                model_name=self.embedding_client.model_name,
+                source_text=document.search_text,
+            )
+
+            self.embedding_repository.create(embedding)
+            created_count += 1
+
+        return {
+            "total_documents": len(documents),
+            "created": created_count,
+            "skipped": skipped_count,
+        }
