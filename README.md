@@ -158,6 +158,54 @@ backend/data/samples/archives/certificates_sample.7z
 python -m scripts.create_test_archive
 ```
 
+## Поиск актуальной ссылки на архив
+
+Реализован базовый поиск актуальной ссылки на архив на страницах открытых данных Росаккредитации.
+
+Для деклараций используется страница `https://fsa.gov.ru/opendata/7736638268-rds/`.
+
+Для сертификатов используется страница `https://fsa.gov.ru/opendata/7736638268-rss/`.
+
+Примеры поиска ссылки:
+
+```bash
+python -m scripts.find_latest_archive --type declaration
+python -m scripts.find_latest_archive --type certificate
+```
+
+После нахождения ссылки архив скачивается через `scripts.download_archive.py`, а затем обрабатывается через `scripts.import_archive.py`.
+
+Пример сценария для деклараций:
+
+```bash
+python -m scripts.download_archive --url "НАЙДЕННАЯ_ССЫЛКА" --output backend/data/raw/declarations/latest_declaration.7z
+python -m scripts.import_archive --archive backend/data/raw/declarations/latest_declaration.7z --type declaration --limit 100
+```
+
+## Полная синхронизация открытых данных
+
+Для администратора реализован отдельный CLI-скрипт полной синхронизации открытых данных Росаккредитации.
+
+Данные Росаккредитации обновляются не каждую минуту, поэтому синхронизация запускается по необходимости.
+
+Полный импорт:
+
+```bash
+python -m scripts.sync_open_data --type declaration
+python -m scripts.sync_open_data --type certificate
+```
+
+Тестовый вариант:
+
+```bash
+python -m scripts.sync_open_data --type declaration --limit 100
+python -m scripts.sync_open_data --type certificate --limit 100
+```
+
+Для полноценной загрузки не нужно указывать `--limit`.
+
+Параметр `--limit` используется для разработки и проверки.
+
 ## Единый импорт архива
 
 Скрипт `import_archive` выполняет полный сценарий: архив -> распаковка -> импорт -> embeddings.
@@ -324,6 +372,8 @@ Endpoint `/ask` работает по следующей схеме:
 
 | Скрипт | Назначение |
 | --- | --- |
+| `scripts/find_latest_archive.py` | Базовый поиск актуальной ссылки на `.7z` архив открытых данных Росаккредитации |
+| `scripts/sync_open_data.py` | Полная административная синхронизация открытых данных: поиск ссылки -> скачивание -> распаковка -> импорт -> embeddings |
 | `scripts/download_archive.py` | Скачивание `.7z` архива по прямой ссылке |
 | `scripts/import_archive.py` | Полный сценарий: архив -> импорт -> embeddings |
 | `scripts/import_data.py` | Импорт CSV в PostgreSQL |
@@ -343,9 +393,9 @@ Endpoint `/ask` работает по следующей схеме:
 - MCP пока представлен как подготовленный tools layer;
 - GigaChat требует внешний API-ключ;
 - качество RAG-ответа зависит от найденных документов и качества LLM;
-- автоматический поиск актуальных ссылок на сайте Росаккредитации не реализован;
+- реализованы базовый поиск актуальной ссылки и административная синхронизация открытых данных, но парсер зависит от структуры страницы и формата ссылок;
 - реализована загрузка архива по прямой ссылке;
-- полноценная автоматическая загрузка актуальных архивов Росаккредитации может быть добавлена отдельно.
+- полный импорт больших архивов может занимать значительное время.
 
 ## Быстрый сценарий запуска
 

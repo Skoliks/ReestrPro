@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TextIO
 
 from sqlalchemy.orm import Session
 
@@ -54,14 +55,20 @@ class ImportService:
             if not path.exists():
                 raise FileNotFoundError(f"Файл не найден: {path.resolve()}")
 
+            total_rows = 0
+            processed_rows = 0
+            failed_rows = 0
+
             with path.open("r", encoding="utf-8-sig", newline="") as file:
-                reader = csv.DictReader(file)
+                reader = csv.DictReader(file, dialect=self._detect_csv_dialect(file))
 
                 for row in reader:
-                    if limit is not None and batch.total_rows >= limit:
+                    if limit is not None and total_rows >= limit:
                         break
 
-                    batch.total_rows += 1
+                    total_rows += 1
+                    current_row_number = total_rows
+                    document_number: str | None = None
 
                     try:
                         document_data = map_row_to_document_data(
@@ -81,18 +88,26 @@ class ImportService:
                             )
 
                             if existing_document is not None:
-                                batch.processed_rows += 1
+                                processed_rows += 1
                                 continue
 
                         document = RegistryDocument(**document_data)
                         self.document_repository.create(document)
-                        batch.processed_rows += 1
+                        processed_rows += 1
 
                     except Exception as exc:
                         self.db.rollback()
-                        batch.failed_rows += 1
-                        print(f"Ошибка строки {batch.total_rows}: {exc}")
+                        failed_rows += 1
+                        print(self._format_row_error(
+                            row_number=current_row_number,
+                            document_type=document_type,
+                            document_number=document_number,
+                            exc=exc,
+                        ))
 
+            batch.total_rows = total_rows
+            batch.processed_rows = processed_rows
+            batch.failed_rows = failed_rows
             batch.status = "completed"
             batch.finished_at = datetime.now(UTC)
             batch.error_message = None
@@ -102,7 +117,7 @@ class ImportService:
             self.db.rollback()
             batch.status = "failed"
             batch.finished_at = datetime.now(UTC)
-            batch.error_message = str(exc)
+            batch.error_message = self._format_batch_error(exc)
             return self.import_batch_repository.update(batch)
 
     def import_file(
@@ -128,3 +143,39 @@ class ImportService:
     def _validate_limit(limit: int | None) -> None:
         if limit is not None and limit < 0:
             raise ValueError("limit must be greater than or equal to 0")
+
+    @staticmethod
+    def _detect_csv_dialect(file: TextIO) -> type[csv.Dialect] | csv.Dialect:
+        sample = file.read(4096)
+        file.seek(0)
+
+        try:
+            return csv.Sniffer().sniff(sample, delimiters=",;")
+        except csv.Error:
+            return csv.excel
+
+    @staticmethod
+    def _format_batch_error(exc: Exception) -> str:
+        if isinstance(exc, (FileNotFoundError, ValueError)):
+            return str(exc)
+
+        return f"{type(exc).__name__}: операция импорта завершилась с ошибкой"
+
+    @staticmethod
+    def _format_row_error(
+        row_number: int,
+        document_type: str,
+        document_number: str | None,
+        exc: Exception,
+    ) -> str:
+        reason_source = getattr(exc, "orig", exc)
+        reason = str(reason_source).replace("\n", " ").strip()
+        reason = reason[:300]
+
+        return (
+            f"Ошибка строки {row_number}: "
+            f"document_type={document_type}, "
+            f"document_number={document_number}, "
+            f"error={type(exc).__name__}, "
+            f"reason={reason}"
+        )

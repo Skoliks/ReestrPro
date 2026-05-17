@@ -4,6 +4,8 @@
 
 Скрипты используются для:
 
+- полной административной синхронизации открытых данных Росаккредитации;
+- поиска актуальной ссылки на `.7z` архив открытых данных Росаккредитации;
 - скачивания архивов по прямой ссылке;
 - создания тестовых архивов;
 - распаковки `.7z` архивов;
@@ -46,6 +48,59 @@ python -m scripts.import_data --file backend/data/extracted/certificates/certifi
 ```
 
 Если `--limit` не указан, скрипт попытается импортировать весь файл.
+
+---
+
+## `find_latest_archive.py`
+
+Скрипт выполняет базовый поиск актуальной ссылки на `.7z` архив открытых данных Росаккредитации.
+
+Для деклараций используется страница `https://fsa.gov.ru/opendata/7736638268-rds/`.
+
+Для сертификатов используется страница `https://fsa.gov.ru/opendata/7736638268-rss/`.
+
+### Примеры запуска
+
+```powershell
+python -m scripts.find_latest_archive --type declaration
+python -m scripts.find_latest_archive --type certificate
+```
+
+Скрипт выводит тип документов, страницу открытых данных и найденную актуальную ссылку.
+
+### Дальнейший сценарий
+
+```powershell
+python -m scripts.download_archive --url "НАЙДЕННАЯ_ССЫЛКА" --output backend/data/raw/declarations/latest_declaration.7z
+python -m scripts.import_archive --archive backend/data/raw/declarations/latest_declaration.7z --type declaration --limit 100
+```
+
+---
+
+## `sync_open_data.py`
+
+Скрипт выполняет полную административную синхронизацию данных: поиск актуальной ссылки, скачивание архива, распаковка, импорт CSV и генерация embeddings.
+
+### Рабочий режим полного импорта
+
+```powershell
+python -m scripts.sync_open_data --type declaration
+python -m scripts.sync_open_data --type certificate
+```
+
+### Тестовый режим
+
+```powershell
+python -m scripts.sync_open_data --type declaration --limit 100
+python -m scripts.sync_open_data --type certificate --limit 100
+```
+
+### Важно
+
+- `--limit` нужен только для тестов и отладки.
+- Без `--limit` импортируется весь CSV-файл.
+- Архив сохраняется в `latest_declaration.7z` или `latest_certificate.7z`, если `--output` не указан.
+- Папка `extracted` нужного типа очищается перед распаковкой, если не указан `--keep-extracted`.
 
 ---
 

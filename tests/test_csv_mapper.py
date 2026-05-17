@@ -1,4 +1,6 @@
-from backend.external.csv_mapper import map_row_to_document_data
+from datetime import date
+
+from backend.external.csv_mapper import map_row_to_document_data, parse_first_date
 
 
 def test_map_declaration_row_to_document_data():
@@ -36,3 +38,16 @@ def test_map_declaration_row_to_document_data():
     assert result["product_codes"] == "1212918000"
     assert "Плодоовощная продукция" in result["search_text"]
     assert "ЕАЭС N RU Д-RU.РА07.А.63018/25" in result["search_text"]
+
+
+def test_parse_first_date_returns_first_date_from_semicolon_list():
+    assert parse_first_date("2021-01-28; 2020-12-15") == date(2021, 1, 28)
+
+
+def test_parse_first_date_parses_dd_mm_yyyy():
+    assert parse_first_date("18.10.2024") == date(2024, 10, 18)
+
+
+def test_parse_first_date_returns_none_for_empty_value():
+    assert parse_first_date("") is None
+    assert parse_first_date(None) is None

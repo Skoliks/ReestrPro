@@ -31,6 +31,20 @@ def parse_date(value: Any) -> date | None:
     return None
 
 
+def parse_first_date(value: str | None) -> date | None:
+    cleaned_value = clean_value(value)
+
+    if cleaned_value is None:
+        return None
+
+    first_part = cleaned_value.split(";", maxsplit=1)[0].strip()
+
+    if not first_part:
+        return None
+
+    return parse_date(first_part)
+
+
 def clean_row(row: dict[str, Any]) -> dict[str, str | None]:
     return {key: clean_value(value) for key, value in row.items()}
 
@@ -101,7 +115,7 @@ def map_declaration_row(
         "product_article": cleaned_row.get("Артикул"),
         "product_codes": cleaned_row.get("Коды ОКПД2 / ТНВЭД"),
         "test_laboratory": cleaned_row.get("ИЛ"),
-        "test_protocol_date": cleaned_row.get("Дата протокола ИЛ"),
+        "test_protocol_date": parse_first_date(cleaned_row.get("Дата протокола ИЛ")),
         "test_protocol_number": cleaned_row.get("Номер протокола ИЛ"),
         "raw_data": cleaned_row,
     }
@@ -145,7 +159,7 @@ def map_certificate_row(
         "product_article": cleaned_row.get("Артикул продукции"),
         "product_codes": cleaned_row.get("Коды ОКПД2/ТНВЭД"),
         "test_laboratory": cleaned_row.get("ИЛ"),
-        "test_protocol_date": cleaned_row.get("Дата протокола ИЛ"),
+        "test_protocol_date": parse_first_date(cleaned_row.get("Дата протокола ИЛ")),
         "test_protocol_number": cleaned_row.get("Номер протокола ИЛ"),
         "raw_data": cleaned_row,
     }
