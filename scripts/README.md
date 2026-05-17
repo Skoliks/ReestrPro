@@ -4,6 +4,7 @@
 
 Скрипты используются для:
 
+- скачивания архивов по прямой ссылке;
 - создания тестовых архивов;
 - распаковки `.7z` архивов;
 - импорта CSV-файлов в базу данных;
@@ -45,6 +46,37 @@ python -m scripts.import_data --file backend/data/extracted/certificates/certifi
 ```
 
 Если `--limit` не указан, скрипт попытается импортировать весь файл.
+
+---
+
+## `download_archive.py`
+
+Скрипт скачивает `.7z` архив по прямой ссылке и сохраняет его в указанную папку.
+
+Использует функцию:
+
+```text
+backend/external/fsa_client.py
+```
+
+### Пример запуска
+
+```powershell
+python -m scripts.download_archive --url "ССЫЛКА_НА_АРХИВ.7z" --output backend/data/raw/declarations/declaration.7z
+```
+
+После скачивания следующий шаг:
+
+```powershell
+python -m scripts.import_archive --archive backend/data/raw/declarations/declaration.7z --type declaration --limit 100
+```
+
+### Аргументы
+
+```text
+--url     прямая ссылка на .7z архив
+--output  путь, куда нужно сохранить архив
+```
 
 ---
 
