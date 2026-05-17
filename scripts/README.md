@@ -151,7 +151,7 @@ backend/data/samples/archives/certificates_sample.7z
 ### Пример запуска
 
 ```powershell
-python -m scripts.check_mapper
+python -m scripts.dev.check_mapper
 ```
 
 Скрипт нужен только для разработки. В основной логике проекта он не используется.
@@ -167,7 +167,7 @@ python -m scripts.check_mapper
 ### Пример запуска
 
 ```powershell
-python -m scripts.check_repository
+python -m scripts.dev.check_repository
 ```
 
 Внимание: скрипт создаёт тестовые записи в базе данных. После проверки их можно удалить вручную через SQL.
@@ -253,4 +253,4 @@ alembic upgrade head
 python -m scripts.import_archive --archive backend/data/samples/archives/declaration_sample.7z --type declaration --limit 1
 python -m scripts.import_archive --archive backend/data/samples/archives/certificates_sample.7z --type certificate --limit 1
 
-uvicorn main:app --reload
+uvicorn backend.main:app --reload

@@ -47,8 +47,6 @@
 - py7zr
 - requests
 
-`requests` указан для полноты списка из постановки задачи, но в текущем состоянии репозитория эта библиотека напрямую не используется и в `requirements.txt` отсутствует.
-
 ## Структура проекта
 
 - `backend/api` — REST endpoint-ы.
@@ -93,6 +91,8 @@ GIGACHAT_CREDENTIALS=your_gigachat_authorization_key
 GIGACHAT_MODEL=GigaChat
 GIGACHAT_VERIFY_SSL_CERTS=False
 ```
+
+Безопасный шаблон переменных можно взять из `.env.example`.
 
 Важно:
 
@@ -197,12 +197,6 @@ python -m scripts.generate_embeddings --limit 10
 
 ```bash
 uvicorn backend.main:app --reload
-```
-
-Если запускать сервер из каталога `backend/`, можно использовать:
-
-```bash
-uvicorn main:app --reload
 ```
 
 Swagger UI:
@@ -344,7 +338,8 @@ Endpoint `/ask` работает по следующей схеме:
 Текущая версия проекта имеет несколько осознанных ограничений:
 
 - используются тестовые фрагменты данных;
-- нет полноценной защиты от дублей документов по `document_number`;
+- сервисная защита от дублей по `document_type + document_number` реализована на уровне `ImportService`;
+- уникального ограничения на уровне БД для этих полей пока нет;
 - MCP пока представлен как подготовленный tools layer;
 - GigaChat требует внешний API-ключ;
 - качество RAG-ответа зависит от найденных документов и качества LLM;
@@ -359,6 +354,7 @@ Endpoint `/ask` работает по следующей схеме:
 ```bash
 docker compose up -d
 alembic upgrade head
+python -m scripts.create_test_archive
 python -m scripts.import_archive --archive backend/data/samples/archives/declaration_sample.7z --type declaration --limit 1
 python -m scripts.import_archive --archive backend/data/samples/archives/certificates_sample.7z --type certificate --limit 1
 uvicorn backend.main:app --reload
