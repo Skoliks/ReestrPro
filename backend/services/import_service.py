@@ -69,6 +69,21 @@ class ImportService:
                             document_type=document_type,
                             import_batch_id=batch.id,
                         )
+
+                        document_number = document_data.get("document_number")
+
+                        if document_number:
+                            existing_document = (
+                                self.document_repository.get_by_document_number_and_type(
+                                    document_number=document_number,
+                                    document_type=document_type,
+                                )
+                            )
+
+                            if existing_document is not None:
+                                batch.processed_rows += 1
+                                continue
+
                         document = RegistryDocument(**document_data)
                         self.document_repository.create(document)
                         batch.processed_rows += 1

@@ -91,3 +91,17 @@ class DocumentRepository:
             query = query.limit(limit)
 
         return query.all()
+    
+    def get_by_document_number_and_type(
+        self,
+        document_number: str,
+        document_type: str,
+    ) -> RegistryDocument | None:
+        return (
+            self.db.query(RegistryDocument)
+            .filter(
+                RegistryDocument.document_number == document_number,
+                RegistryDocument.document_type == document_type,
+            )
+            .first()
+        )
