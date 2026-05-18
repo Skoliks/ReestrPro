@@ -1,0 +1,99 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Manrope:wght@500;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100vh;
+    margin: 0;
+    background:
+      radial-gradient(circle at top, rgba(110, 231, 242, 0.06), transparent 20%),
+      linear-gradient(180deg, #07111f 0%, #050b16 45%, #030712 100%);
+    color: #e2e8f0;
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  ::selection {
+    background: rgba(110, 231, 242, 0.22);
+    color: #f8fafc;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.5);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background: rgba(148, 163, 184, 0.35);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-family: "Manrope", "IBM Plex Sans", sans-serif;
+  }
+
+  .surface-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(10, 16, 28, 0.72);
+    backdrop-filter: blur(18px);
+  }
+}
+
+.thinking-dots span {
+  display: inline-block;
+  height: 0.45rem;
+  width: 0.45rem;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.9);
+  animation: thinking-dot 1.4s infinite ease-in-out;
+}
+
+.thinking-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes thinking-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}

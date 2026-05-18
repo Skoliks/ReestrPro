@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
@@ -60,6 +61,7 @@ class ImportService:
             failed_rows = 0
 
             with path.open("r", encoding="utf-8-sig", newline="") as file:
+                self._increase_csv_field_size_limit()
                 reader = csv.DictReader(file, dialect=self._detect_csv_dialect(file))
 
                 for row in reader:
@@ -155,11 +157,29 @@ class ImportService:
             return csv.excel
 
     @staticmethod
+    def _increase_csv_field_size_limit() -> None:
+        max_size = sys.maxsize
+
+        while True:
+            try:
+                csv.field_size_limit(max_size)
+                break
+            except OverflowError:
+                max_size = int(max_size / 10)
+
+    @staticmethod
     def _format_batch_error(exc: Exception) -> str:
         if isinstance(exc, (FileNotFoundError, ValueError)):
-            return str(exc)
+            return f"Error: {type(exc).__name__}: {str(exc)[:300]}"
 
-        return f"{type(exc).__name__}: операция импорта завершилась с ошибкой"
+        reason_source = getattr(exc, "orig", exc)
+        reason = str(reason_source).replace("\n", " ").strip()
+        reason = reason[:300]
+
+        if not reason:
+            reason = "операция импорта завершилась с ошибкой"
+
+        return f"Error: {type(exc).__name__}: {reason}"
 
     @staticmethod
     def _format_row_error(
@@ -171,11 +191,15 @@ class ImportService:
         reason_source = getattr(exc, "orig", exc)
         reason = str(reason_source).replace("\n", " ").strip()
         reason = reason[:300]
+        hint = ""
+
+        if "value too long for type character varying" in reason.lower():
+            hint = " hint=вероятно одно из текстовых полей превышает ограничение длины колонки."
 
         return (
             f"Ошибка строки {row_number}: "
             f"document_type={document_type}, "
             f"document_number={document_number}, "
             f"error={type(exc).__name__}, "
-            f"reason={reason}"
+            f"reason={reason}{hint}"
         )

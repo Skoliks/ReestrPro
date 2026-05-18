@@ -51,3 +51,23 @@ def test_parse_first_date_parses_dd_mm_yyyy():
 def test_parse_first_date_returns_none_for_empty_value():
     assert parse_first_date("") is None
     assert parse_first_date(None) is None
+
+
+def test_map_declaration_row_keeps_long_product_full_name() -> None:
+    long_name = ("Очень длинное наименование продукции " * 12).strip()
+
+    row = {
+        "id": "test-declaration-long-name",
+        "Статус": "Архивный",
+        "Номер ДС": "DECL-LONG-001",
+        "Полное наименование": long_name,
+    }
+
+    result = map_row_to_document_data(
+        row=row,
+        document_type="declaration",
+        import_batch_id=1,
+    )
+
+    assert result["product_full_name"] == long_name
+    assert len(result["product_full_name"]) > 255

@@ -285,3 +285,84 @@ def test_import_csv_with_limit_one_does_not_import_second_row_after_first_row_er
     assert "document_type=declaration" in captured.out
     assert "document_number=DECL-ERROR" in captured.out
     assert "reason=invalid input syntax for type date" in captured.out
+
+
+def test_import_csv_with_limit_none_reads_all_rows(monkeypatch, tmp_path: Path):
+    csv_path = tmp_path / "documents.csv"
+    csv_path.write_text(
+        "id,Номер ДС,Статус\n"
+        "row-1,DECL-001,Действует\n"
+        "row-2,DECL-002,Действует\n",
+        encoding="utf-8",
+    )
+
+    def fake_map_row_to_document_data(row, document_type, import_batch_id):
+        return {
+            "import_batch_id": import_batch_id,
+            "source_document_id": row["id"],
+            "document_type": document_type,
+            "document_number": row["Номер ДС"],
+            "status": row["Статус"],
+            "search_text": row["Номер ДС"],
+            "raw_data": row,
+        }
+
+    monkeypatch.setattr(
+        "backend.services.import_service.map_row_to_document_data",
+        fake_map_row_to_document_data,
+    )
+
+    db = FakeDB()
+    document_repository = FakeDocumentRepository()
+    service = ImportService(
+        db=db,
+        import_batch_repository=FakeImportBatchRepository(),
+        document_repository=document_repository,
+    )
+
+    batch = service.import_csv(csv_path, document_type="declaration", limit=None)
+
+    assert batch.status == "completed"
+    assert batch.total_rows == 2
+    assert batch.processed_rows == 2
+    assert batch.failed_rows == 0
+    assert db.rollback_calls == 0
+    assert len(document_repository.created_documents) == 2
+    assert [document.document_number for document in document_repository.created_documents] == [
+        "DECL-001",
+        "DECL-002",
+    ]
+
+
+def test_import_csv_saves_top_level_error_message(monkeypatch, tmp_path: Path):
+    csv_path = tmp_path / "documents.csv"
+    write_csv(csv_path, ["row-1"])
+
+    monkeypatch.setattr(
+        ImportService,
+        "_detect_csv_dialect",
+        staticmethod(lambda file: (_ for _ in ()).throw(
+            TypeError("'>=' not supported between instances of 'int' and 'NoneType'")
+        )),
+    )
+
+    service = ImportService(
+        db=FakeDB(),
+        import_batch_repository=FakeImportBatchRepository(),
+        document_repository=FakeDocumentRepository(),
+    )
+
+    batch = service.import_csv(csv_path, document_type="declaration", limit=None)
+
+    assert batch.status == "failed"
+    assert batch.total_rows == 0
+    assert batch.processed_rows == 0
+    assert batch.failed_rows == 0
+    assert (
+        batch.error_message
+        == "Error: TypeError: '>=' not supported between instances of 'int' and 'NoneType'"
+    )
+
+
+def test_increase_csv_field_size_limit_handles_large_values() -> None:
+    ImportService._increase_csv_field_size_limit()
