@@ -1,37 +1,37 @@
 import argparse
+import asyncio
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from backend.db.session import SessionLocal
 from backend.services.embedding_service import EmbeddingService
 
 
-def main() -> None:
+async def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Генерация embeddings для документов"
+        description="Generate embeddings for imported documents"
     )
 
     parser.add_argument(
         "--limit",
         type=int,
         default=10,
-        help="Сколько документов обработать",
+        help="How many documents to process",
     )
 
     args = parser.parse_args()
 
-    db = SessionLocal()
-
-    try:
+    async with SessionLocal() as db:
         service = EmbeddingService(db)
-        result = service.generate_for_documents(limit=args.limit)
+        result = await service.generate_for_documents(limit=args.limit)
 
-        print("Генерация embeddings завершена")
-        print(f"Всего документов взято: {result['total_documents']}")
-        print(f"Создано embeddings: {result['created']}")
-        print(f"Пропущено: {result['skipped']}")
-
-    finally:
-        db.close()
+        print("Embedding generation completed")
+        print(f"Total documents selected: {result['total_documents']}")
+        print(f"Created embeddings: {result['created']}")
+        print(f"Skipped: {result['skipped']}")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

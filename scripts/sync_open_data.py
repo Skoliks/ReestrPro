@@ -1,6 +1,10 @@
 import argparse
+import asyncio
 import shutil
+import sys
 from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from backend.external.archive_extractor import extract_7z_archive
 from backend.external.fsa_client import (
@@ -66,12 +70,14 @@ def build_batch_report(batch: object) -> dict[str, object]:
         "status": getattr(batch, "status"),
         "total_rows": getattr(batch, "total_rows"),
         "processed_rows": getattr(batch, "processed_rows"),
+        "added_rows": getattr(batch, "added_rows", None),
+        "duplicate_rows": getattr(batch, "duplicate_rows", None),
         "failed_rows": getattr(batch, "failed_rows"),
         "error_message": getattr(batch, "error_message"),
     }
 
 
-def sync_open_data(
+async def sync_open_data(
     document_type: str,
     limit: int | None = None,
     output_path: str | Path | None = None,
@@ -131,11 +137,9 @@ def sync_open_data(
     print("Архив распакован")
     print(f"Найден CSV-файл: {csv_file}")
 
-    db = SessionLocal()
-
-    try:
+    async with SessionLocal() as db:
         import_service = ImportService(db)
-        batch = import_service.import_csv(
+        batch = await import_service.import_csv(
             file_path=csv_file,
             document_type=document_type,
             limit=limit,
@@ -144,13 +148,10 @@ def sync_open_data(
         batch_report = build_batch_report(batch)
 
         embedding_service = EmbeddingService(db)
-        embedding_result = embedding_service.generate_for_import_batch(
+        embedding_result = await embedding_service.generate_for_import_batch(
             import_batch_id=batch_report["batch_id"],
             limit=batch_report["processed_rows"],
         )
-
-    finally:
-        db.close()
 
     return {
         "document_type": document_type,
@@ -163,6 +164,8 @@ def sync_open_data(
         "status": batch_report["status"],
         "total_rows": batch_report["total_rows"],
         "processed_rows": batch_report["processed_rows"],
+        "added_rows": batch_report["added_rows"],
+        "duplicate_rows": batch_report["duplicate_rows"],
         "failed_rows": batch_report["failed_rows"],
         "embeddings_total_documents": embedding_result["total_documents"],
         "embeddings_created": embedding_result["created"],
@@ -184,6 +187,8 @@ def print_sync_report(report: dict[str, object]) -> None:
     print(f"status: {report['status']}")
     print(f"total_rows: {report['total_rows']}")
     print(f"processed_rows: {report['processed_rows']}")
+    print(f"added_rows: {report['added_rows']}")
+    print(f"duplicate_rows: {report['duplicate_rows']}")
     print(f"failed_rows: {report['failed_rows']}")
     print(f"embeddings_total_documents: {report['embeddings_total_documents']}")
     print(f"embeddings_created: {report['embeddings_created']}")
@@ -195,7 +200,7 @@ def print_sync_report(report: dict[str, object]) -> None:
         print(f"Error message: {error_message}")
 
 
-def main() -> None:
+async def main() -> None:
     parser = argparse.ArgumentParser(
         description="Полная административная синхронизация открытых данных Росаккредитации"
     )
@@ -228,7 +233,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    report = sync_open_data(
+    report = await sync_open_data(
         document_type=args.type,
         limit=args.limit,
         output_path=args.output,
@@ -238,4 +243,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

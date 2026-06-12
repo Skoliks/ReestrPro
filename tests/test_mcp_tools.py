@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date
 
 from backend.mcp import tools
@@ -8,6 +9,12 @@ class FakeDB:
         self.closed = False
 
     def close(self) -> None:
+        self.closed = True
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, traceback):
         self.closed = True
 
 
@@ -33,7 +40,7 @@ def test_search_registry_returns_json_compatible_items(monkeypatch):
         def __init__(self, db):
             assert db is fake_db
 
-        def hybrid_search(self, query: str, limit: int):
+        async def hybrid_search(self, query: str, limit: int):
             assert query == "test"
             assert limit == 5
             return [
@@ -52,7 +59,7 @@ def test_search_registry_returns_json_compatible_items(monkeypatch):
         lambda: FakeHybridSearchService,
     )
 
-    result = tools.search_registry(query="test", limit=5)
+    result = asyncio.run(tools.search_registry(query="test", limit=5))
 
     assert fake_db.closed is True
     assert result["query"] == "test"
@@ -83,7 +90,7 @@ def test_get_document_card_closes_db_session(monkeypatch):
         def __init__(self, db):
             assert db is fake_db
 
-        def get_by_id(self, document_id: int):
+        async def get_by_id(self, document_id: int):
             assert document_id == 7
             return FakeDocument()
 
@@ -94,7 +101,7 @@ def test_get_document_card_closes_db_session(monkeypatch):
         lambda: FakeDocumentRepository,
     )
 
-    result = tools.get_document_card(document_id=7)
+    result = asyncio.run(tools.get_document_card(document_id=7))
 
     assert fake_db.closed is True
     assert result["found"] is True
@@ -110,7 +117,7 @@ def test_ask_registry_uses_rag_service_without_real_llm(monkeypatch):
         def __init__(self, db):
             assert db is fake_db
 
-        def ask(self, question: str, limit: int):
+        async def ask(self, question: str, limit: int):
             assert question == "question"
             assert limit == 3
             return {
@@ -132,7 +139,7 @@ def test_ask_registry_uses_rag_service_without_real_llm(monkeypatch):
         def __init__(self, db):
             assert db is fake_db
 
-        def get_by_id(self, document_id: int):
+        async def get_by_id(self, document_id: int):
             assert document_id == 7
             return FakeDocument()
 
@@ -144,7 +151,7 @@ def test_ask_registry_uses_rag_service_without_real_llm(monkeypatch):
         lambda: FakeDocumentRepository,
     )
 
-    result = tools.ask_registry(question="question", limit=3)
+    result = asyncio.run(tools.ask_registry(question="question", limit=3))
 
     assert fake_db.closed is True
     assert result["question"] == "question"

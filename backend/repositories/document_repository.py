@@ -1,30 +1,30 @@
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.models import RegistryDocument
 
 
 class DocumentRepository:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def create(self, document: RegistryDocument) -> RegistryDocument:
+    async def create(self, document: RegistryDocument) -> RegistryDocument:
         self.db.add(document)
-        self.db.commit()
-        self.db.refresh(document)
+        await self.db.commit()
+        await self.db.refresh(document)
         return document
 
-    def create_many(self, documents: list[RegistryDocument]) -> None:
+    async def create_many(self, documents: list[RegistryDocument]) -> None:
         self.db.add_all(documents)
-        self.db.commit()
+        await self.db.commit()
 
-    def get_by_id(self, document_id: int) -> RegistryDocument | None:
-        return (
-            self.db.query(RegistryDocument)
-            .filter(RegistryDocument.id == document_id)
-            .first()
+    async def get_by_id(self, document_id: int) -> RegistryDocument | None:
+        result = await self.db.execute(
+            select(RegistryDocument).where(RegistryDocument.id == document_id)
         )
-    def search(
+        return result.scalar_one_or_none()
+
+    async def search(
         self,
         query: str | None = None,
         document_type: str | None = None,
@@ -32,18 +32,17 @@ class DocumentRepository:
         limit: int = 10,
         offset: int = 0,
     ) -> tuple[list[RegistryDocument], int]:
-        db_query = self.db.query(RegistryDocument)
+        filters = []
 
         if document_type:
-            db_query = db_query.filter(RegistryDocument.document_type == document_type)
+            filters.append(RegistryDocument.document_type == document_type)
 
         if status:
-            db_query = db_query.filter(RegistryDocument.status == status)
+            filters.append(RegistryDocument.status == status)
 
         if query:
             pattern = f"%{query}%"
-
-            db_query = db_query.filter(
+            filters.append(
                 or_(
                     RegistryDocument.document_number.ilike(pattern),
                     RegistryDocument.applicant_name.ilike(pattern),
@@ -54,54 +53,58 @@ class DocumentRepository:
                 )
             )
 
-        total = db_query.count()
+        total_result = await self.db.execute(
+            select(func.count()).select_from(RegistryDocument).where(*filters)
+        )
+        total = total_result.scalar_one()
 
-        items = (
-            db_query
+        items_result = await self.db.execute(
+            select(RegistryDocument)
+            .where(*filters)
             .order_by(RegistryDocument.id.desc())
             .offset(offset)
             .limit(limit)
-            .all()
         )
+        items = list(items_result.scalars().all())
 
         return items, total
-    
-    def get_documents_for_embeddings(self, limit: int = 10):
-        return (
-            self.db.query(RegistryDocument)
-            .filter(RegistryDocument.search_text.isnot(None))
+
+    async def get_documents_for_embeddings(self, limit: int = 10):
+        result = await self.db.execute(
+            select(RegistryDocument)
+            .where(RegistryDocument.search_text.isnot(None))
             .order_by(RegistryDocument.id.asc())
             .limit(limit)
-            .all()
         )
-        
-    def get_documents_for_embeddings_by_batch(
-    self,
-    import_batch_id: int,
-    limit: int | None = None,
+        return list(result.scalars().all())
+
+    async def get_documents_for_embeddings_by_batch(
+        self,
+        import_batch_id: int,
+        limit: int | None = None,
     ):
         query = (
-            self.db.query(RegistryDocument)
-            .filter(RegistryDocument.import_batch_id == import_batch_id)
-            .filter(RegistryDocument.search_text.isnot(None))
+            select(RegistryDocument)
+            .where(RegistryDocument.import_batch_id == import_batch_id)
+            .where(RegistryDocument.search_text.isnot(None))
             .order_by(RegistryDocument.id.asc())
         )
 
         if limit is not None:
             query = query.limit(limit)
 
-        return query.all()
-    
-    def get_by_document_number_and_type(
+        result = await self.db.execute(query)
+        return list(result.scalars().all())
+
+    async def get_by_document_number_and_type(
         self,
         document_number: str,
         document_type: str,
     ) -> RegistryDocument | None:
-        return (
-            self.db.query(RegistryDocument)
-            .filter(
+        result = await self.db.execute(
+            select(RegistryDocument).where(
                 RegistryDocument.document_number == document_number,
                 RegistryDocument.document_type == document_type,
             )
-            .first()
         )
+        return result.scalar_one_or_none()

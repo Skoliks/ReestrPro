@@ -1,22 +1,22 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.repositories.document_repository import DocumentRepository
 from backend.services.embedding_service import EmbeddingService
 
 
 class HybridSearchService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.document_repository = DocumentRepository(db)
         self.embedding_service = EmbeddingService(db)
 
-    def hybrid_search(
+    async def hybrid_search(
         self,
         query: str,
         document_type: str | None = None,
         status: str | None = None,
         limit: int = 10,
     ) -> list[dict]:
-        classic_items, _ = self.document_repository.search(
+        classic_items, _ = await self.document_repository.search(
             query=query,
             document_type=document_type,
             status=status,
@@ -24,7 +24,7 @@ class HybridSearchService:
             offset=0,
         )
 
-        semantic_results = self.embedding_service.semantic_search(
+        semantic_results = await self.embedding_service.semantic_search(
             query=query,
             limit=limit,
         )

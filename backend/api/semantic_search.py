@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.core.logging import get_logger
 from backend.db.session import get_db
 from backend.schemas.semantic_search import (
     SemanticSearchRequest,
@@ -10,19 +12,32 @@ from backend.schemas.semantic_search import (
 from backend.services.embedding_service import EmbeddingService
 
 router = APIRouter(prefix="/semantic-search", tags=["semantic-search"])
+logger = get_logger(__name__)
 
 
 @router.post("", response_model=SemanticSearchResponse)
-def semantic_search(
+async def semantic_search(
     request: SemanticSearchRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = EmbeddingService(db)
-
-    results = service.semantic_search(
-        query=request.query,
-        limit=request.limit,
-    )
+    try:
+        service = EmbeddingService(db)
+        results = await service.semantic_search(
+            query=request.query,
+            limit=request.limit,
+        )
+    except SQLAlchemyError:
+        logger.exception("Semantic search failed due to database error")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Semantic search service is temporarily unavailable",
+        )
+    except Exception:
+        logger.exception("Semantic search failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Semantic search request failed",
+        )
 
     items = [
         SemanticSearchResultItem(

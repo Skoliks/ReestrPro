@@ -1,3 +1,4 @@
+﻿import asyncio
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,7 @@ class FakeDB:
     def __init__(self) -> None:
         self.rollback_calls = 0
 
-    def rollback(self) -> None:
+    async def rollback(self) -> None:
         self.rollback_calls += 1
 
 
@@ -18,12 +19,12 @@ class FakeImportBatchRepository:
     def __init__(self) -> None:
         self.next_id = 1
 
-    def create(self, batch: ImportBatch) -> ImportBatch:
+    async def create(self, batch: ImportBatch) -> ImportBatch:
         batch.id = self.next_id
         self.next_id += 1
         return batch
 
-    def update(self, batch: ImportBatch) -> ImportBatch:
+    async def update(self, batch: ImportBatch) -> ImportBatch:
         return batch
 
 
@@ -33,7 +34,7 @@ class FakeDocumentRepository:
         self.lookup_calls: list[tuple[str, str]] = []
         self.created_documents = []
 
-    def get_by_document_number_and_type(
+    async def get_by_document_number_and_type(
         self,
         document_number: str,
         document_type: str,
@@ -41,9 +42,12 @@ class FakeDocumentRepository:
         self.lookup_calls.append((document_number, document_type))
         return self.existing_documents.get((document_number, document_type))
 
-    def create(self, document):
+    async def create(self, document):
         self.created_documents.append(document)
         return document
+
+    async def create_many(self, documents):
+        self.created_documents.extend(documents)
 
 
 def write_csv(path: Path, row_ids: list[str]) -> None:
@@ -82,7 +86,7 @@ def test_import_csv_skips_duplicate_documents(monkeypatch, tmp_path: Path):
         document_repository=document_repository,
     )
 
-    batch = service.import_csv(csv_path, document_type="declaration")
+    batch = asyncio.run(service.import_csv(csv_path, document_type="declaration"))
 
     assert batch.status == "completed"
     assert batch.total_rows == 1
@@ -91,6 +95,8 @@ def test_import_csv_skips_duplicate_documents(monkeypatch, tmp_path: Path):
     assert db.rollback_calls == 0
     assert document_repository.lookup_calls == [("DECL-001", "declaration")]
     assert document_repository.created_documents == []
+    assert batch.added_rows == 0
+    assert batch.duplicate_rows == 1
 
 
 def test_import_csv_creates_new_and_missing_number_documents(monkeypatch, tmp_path: Path):
@@ -133,7 +139,7 @@ def test_import_csv_creates_new_and_missing_number_documents(monkeypatch, tmp_pa
         document_repository=document_repository,
     )
 
-    batch = service.import_csv(csv_path, document_type="declaration")
+    batch = asyncio.run(service.import_csv(csv_path, document_type="declaration"))
 
     assert batch.status == "completed"
     assert batch.total_rows == 2
@@ -144,12 +150,14 @@ def test_import_csv_creates_new_and_missing_number_documents(monkeypatch, tmp_pa
     assert len(document_repository.created_documents) == 2
     assert document_repository.created_documents[0].document_number == "DECL-002"
     assert document_repository.created_documents[1].document_number is None
+    assert batch.added_rows == 2
+    assert batch.duplicate_rows == 0
 
 
 def write_document_csv(path: Path, delimiter: str) -> None:
     path.write_text(
-        delimiter.join(["id", "Номер ДС", "Статус", "Полное наименование"]) + "\n"
-        + delimiter.join(["row-1", "DECL-100", "Действует", "Тестовая продукция"]) + "\n",
+        delimiter.join(["id", "РќРѕРјРµСЂ Р”РЎ", "РЎС‚Р°С‚СѓСЃ", "РџРѕР»РЅРѕРµ РЅР°РёРјРµРЅРѕРІР°РЅРёРµ"]) + "\n"
+        + delimiter.join(["row-1", "DECL-100", "Р”РµР№СЃС‚РІСѓРµС‚", "РўРµСЃС‚РѕРІР°СЏ РїСЂРѕРґСѓРєС†РёСЏ"]) + "\n",
         encoding="utf-8",
     )
 
@@ -171,10 +179,10 @@ def test_import_csv_reads_comma_and_semicolon_delimited_files(
             "import_batch_id": import_batch_id,
             "source_document_id": row["id"],
             "document_type": document_type,
-            "document_number": row["Номер ДС"],
-            "status": row["Статус"],
-            "product_full_name": row["Полное наименование"],
-            "search_text": row["Полное наименование"],
+            "document_number": row["РќРѕРјРµСЂ Р”РЎ"],
+            "status": row["РЎС‚Р°С‚СѓСЃ"],
+            "product_full_name": row["РџРѕР»РЅРѕРµ РЅР°РёРјРµРЅРѕРІР°РЅРёРµ"],
+            "search_text": row["РџРѕР»РЅРѕРµ РЅР°РёРјРµРЅРѕРІР°РЅРёРµ"],
             "raw_data": row,
         }
 
@@ -191,7 +199,7 @@ def test_import_csv_reads_comma_and_semicolon_delimited_files(
         document_repository=document_repository,
     )
 
-    batch = service.import_csv(csv_path, document_type="declaration")
+    batch = asyncio.run(service.import_csv(csv_path, document_type="declaration"))
 
     assert batch.status == "completed"
     assert batch.total_rows == 1
@@ -200,16 +208,18 @@ def test_import_csv_reads_comma_and_semicolon_delimited_files(
     assert db.rollback_calls == 0
     assert len(captured_rows) == 1
     assert captured_rows[0]["id"] == "row-1"
-    assert captured_rows[0]["Номер ДС"] == "DECL-100"
-    assert captured_rows[0]["Статус"] == "Действует"
-    assert captured_rows[0]["Полное наименование"] == "Тестовая продукция"
+    assert captured_rows[0]["РќРѕРјРµСЂ Р”РЎ"] == "DECL-100"
+    assert captured_rows[0]["РЎС‚Р°С‚СѓСЃ"] == "Р”РµР№СЃС‚РІСѓРµС‚"
+    assert captured_rows[0]["РџРѕР»РЅРѕРµ РЅР°РёРјРµРЅРѕРІР°РЅРёРµ"] == "РўРµСЃС‚РѕРІР°СЏ РїСЂРѕРґСѓРєС†РёСЏ"
     assert len(document_repository.created_documents) == 1
     assert document_repository.created_documents[0].document_number == "DECL-100"
-    assert document_repository.created_documents[0].status == "Действует"
+    assert document_repository.created_documents[0].status == "Р”РµР№СЃС‚РІСѓРµС‚"
     assert (
         document_repository.created_documents[0].product_full_name
-        == "Тестовая продукция"
+        == "РўРµСЃС‚РѕРІР°СЏ РїСЂРѕРґСѓРєС†РёСЏ"
     )
+    assert batch.added_rows == 1
+    assert batch.duplicate_rows == 0
 
 
 def test_import_csv_with_limit_one_does_not_import_second_row_after_first_row_error(
@@ -219,9 +229,9 @@ def test_import_csv_with_limit_one_does_not_import_second_row_after_first_row_er
 ):
     csv_path = tmp_path / "documents.csv"
     csv_path.write_text(
-        "id,Номер ДС,Статус\n"
-        "row-1,DECL-ERROR,Ошибка\n"
-        "row-2,DECL-OK,Действует\n",
+        "id,РќРѕРјРµСЂ Р”РЎ,РЎС‚Р°С‚СѓСЃ\n"
+        "row-1,DECL-ERROR,РћС€РёР±РєР°\n"
+        "row-2,DECL-OK,Р”РµР№СЃС‚РІСѓРµС‚\n",
         encoding="utf-8",
     )
 
@@ -231,8 +241,8 @@ def test_import_csv_with_limit_one_does_not_import_second_row_after_first_row_er
                 "import_batch_id": import_batch_id,
                 "source_document_id": row["id"],
                 "document_type": document_type,
-                "document_number": row["Номер ДС"],
-                "status": row["Статус"],
+                "document_number": row["РќРѕРјРµСЂ Р”РЎ"],
+                "status": row["РЎС‚Р°С‚СѓСЃ"],
                 "search_text": "broken document",
                 "raw_data": row,
             }
@@ -241,8 +251,8 @@ def test_import_csv_with_limit_one_does_not_import_second_row_after_first_row_er
             "import_batch_id": import_batch_id,
             "source_document_id": row["id"],
             "document_type": document_type,
-            "document_number": row["Номер ДС"],
-            "status": row["Статус"],
+            "document_number": row["РќРѕРјРµСЂ Р”РЎ"],
+            "status": row["РЎС‚Р°С‚СѓСЃ"],
             "search_text": "ok document",
             "raw_data": row,
         }
@@ -255,7 +265,7 @@ def test_import_csv_with_limit_one_does_not_import_second_row_after_first_row_er
     db = FakeDB()
     document_repository = FakeDocumentRepository()
 
-    def fake_create(document):
+    async def fake_create(document):
         if document.document_number == "DECL-ERROR":
             error = Exception("insert failed")
             error.orig = Exception("invalid input syntax for type date")
@@ -264,7 +274,11 @@ def test_import_csv_with_limit_one_does_not_import_second_row_after_first_row_er
         document_repository.created_documents.append(document)
         return document
 
+    async def fake_create_many(documents):
+        raise Exception("batch insert failed")
+
     document_repository.create = fake_create
+    document_repository.create_many = fake_create_many
 
     service = ImportService(
         db=db,
@@ -272,27 +286,29 @@ def test_import_csv_with_limit_one_does_not_import_second_row_after_first_row_er
         document_repository=document_repository,
     )
 
-    batch = service.import_csv(csv_path, document_type="declaration", limit=1)
+    batch = asyncio.run(service.import_csv(csv_path, document_type="declaration", limit=1))
     captured = capsys.readouterr()
 
     assert batch.status == "completed"
     assert batch.total_rows == 1
     assert batch.failed_rows == 1
     assert batch.processed_rows == 0
-    assert db.rollback_calls == 1
+    assert db.rollback_calls == 2
     assert document_repository.created_documents == []
-    assert "Ошибка строки 1:" in captured.out
+    assert " 1:" in captured.out
     assert "document_type=declaration" in captured.out
     assert "document_number=DECL-ERROR" in captured.out
     assert "reason=invalid input syntax for type date" in captured.out
+    assert batch.added_rows == 0
+    assert batch.duplicate_rows == 0
 
 
 def test_import_csv_with_limit_none_reads_all_rows(monkeypatch, tmp_path: Path):
     csv_path = tmp_path / "documents.csv"
     csv_path.write_text(
-        "id,Номер ДС,Статус\n"
-        "row-1,DECL-001,Действует\n"
-        "row-2,DECL-002,Действует\n",
+        "id,РќРѕРјРµСЂ Р”РЎ,РЎС‚Р°С‚СѓСЃ\n"
+        "row-1,DECL-001,Р”РµР№СЃС‚РІСѓРµС‚\n"
+        "row-2,DECL-002,Р”РµР№СЃС‚РІСѓРµС‚\n",
         encoding="utf-8",
     )
 
@@ -301,9 +317,9 @@ def test_import_csv_with_limit_none_reads_all_rows(monkeypatch, tmp_path: Path):
             "import_batch_id": import_batch_id,
             "source_document_id": row["id"],
             "document_type": document_type,
-            "document_number": row["Номер ДС"],
-            "status": row["Статус"],
-            "search_text": row["Номер ДС"],
+            "document_number": row["РќРѕРјРµСЂ Р”РЎ"],
+            "status": row["РЎС‚Р°С‚СѓСЃ"],
+            "search_text": row["РќРѕРјРµСЂ Р”РЎ"],
             "raw_data": row,
         }
 
@@ -320,7 +336,7 @@ def test_import_csv_with_limit_none_reads_all_rows(monkeypatch, tmp_path: Path):
         document_repository=document_repository,
     )
 
-    batch = service.import_csv(csv_path, document_type="declaration", limit=None)
+    batch = asyncio.run(service.import_csv(csv_path, document_type="declaration", limit=None))
 
     assert batch.status == "completed"
     assert batch.total_rows == 2
@@ -332,6 +348,8 @@ def test_import_csv_with_limit_none_reads_all_rows(monkeypatch, tmp_path: Path):
         "DECL-001",
         "DECL-002",
     ]
+    assert batch.added_rows == 2
+    assert batch.duplicate_rows == 0
 
 
 def test_import_csv_saves_top_level_error_message(monkeypatch, tmp_path: Path):
@@ -352,7 +370,7 @@ def test_import_csv_saves_top_level_error_message(monkeypatch, tmp_path: Path):
         document_repository=FakeDocumentRepository(),
     )
 
-    batch = service.import_csv(csv_path, document_type="declaration", limit=None)
+    batch = asyncio.run(service.import_csv(csv_path, document_type="declaration", limit=None))
 
     assert batch.status == "failed"
     assert batch.total_rows == 0

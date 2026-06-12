@@ -1,16 +1,16 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.external.llm_client import LLMClient
 from backend.services.hybrid_search_service import HybridSearchService
 
 
 class RagService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.hybrid_search_service = HybridSearchService(db)
         self.llm_client = LLMClient()
 
-    def ask(self, question: str, limit: int = 3) -> dict:
-        search_results = self.hybrid_search_service.hybrid_search(
+    async def ask(self, question: str, limit: int = 3) -> dict:
+        search_results = await self.hybrid_search_service.hybrid_search(
             query=question,
             limit=limit,
         )

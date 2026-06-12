@@ -11,13 +11,7 @@ from sqlalchemy import pool
 
 from alembic import context
 
-DATABASE_URL = (
-    f"postgresql://{settings.db_user}:"
-    f"{settings.db_password}@"
-    f"{settings.db_host}:"
-    f"{settings.db_port}/"
-    f"{settings.db_name}"
-)
+DATABASE_URL = settings.database_url
 
 
 # this is the Alembic Config object, which provides
@@ -92,4 +86,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

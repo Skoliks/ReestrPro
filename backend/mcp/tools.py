@@ -55,15 +55,13 @@ def _format_document(
     }
 
 
-def search_registry(query: str, limit: int = 5) -> dict[str, Any]:
+async def search_registry(query: str, limit: int = 5) -> dict[str, Any]:
     """Search certificates and declarations with the existing hybrid search service."""
-    db = SessionLocal()
-
-    try:
+    async with SessionLocal() as db:
         HybridSearchService = _get_hybrid_search_service_class()
         service = HybridSearchService(db)
 
-        results = service.hybrid_search(
+        results = await service.hybrid_search(
             query=query,
             limit=limit,
         )
@@ -88,18 +86,13 @@ def search_registry(query: str, limit: int = 5) -> dict[str, Any]:
             "items": items,
         }
 
-    finally:
-        db.close()
 
-
-def get_document_card(document_id: int) -> dict[str, Any]:
+async def get_document_card(document_id: int) -> dict[str, Any]:
     """Return a JSON-compatible document card by registry document id."""
-    db = SessionLocal()
-
-    try:
+    async with SessionLocal() as db:
         DocumentRepository = _get_document_repository_class()
         repository = DocumentRepository(db)
-        document = repository.get_by_id(document_id)
+        document = await repository.get_by_id(document_id)
 
         if document is None:
             return {
@@ -113,19 +106,14 @@ def get_document_card(document_id: int) -> dict[str, Any]:
             "document": _format_document(document=document),
         }
 
-    finally:
-        db.close()
 
-
-def ask_registry(question: str, limit: int = 3) -> dict[str, Any]:
+async def ask_registry(question: str, limit: int = 3) -> dict[str, Any]:
     """Ask a RAG question using the existing RagService and return answer with sources."""
-    db = SessionLocal()
-
-    try:
+    async with SessionLocal() as db:
         RagService = _get_rag_service_class()
         DocumentRepository = _get_document_repository_class()
         service = RagService(db)
-        result = service.ask(question=question, limit=limit)
+        result = await service.ask(question=question, limit=limit)
         repository = DocumentRepository(db)
 
         sources = []
@@ -133,7 +121,7 @@ def ask_registry(question: str, limit: int = 3) -> dict[str, Any]:
         for source in result.get("sources", []):
             document_id = source.get("document_id")
             document = (
-                repository.get_by_id(document_id)
+                await repository.get_by_id(document_id)
                 if document_id is not None
                 else None
             )
@@ -167,6 +155,3 @@ def ask_registry(question: str, limit: int = 3) -> dict[str, Any]:
             "explanation": result["answer"],
             "sources": sources,
         }
-
-    finally:
-        db.close()

@@ -436,3 +436,114 @@ docker compose down -v
 ```
 
 Команда `docker compose down -v` удаляет volume с данными PostgreSQL.
+
+## Production-ready local checklist
+
+Этот раздел описывает безопасный локальный запуск проекта без production-deploy усложнений.
+
+### Переменные окружения
+
+Скопировать пример окружения:
+
+```bash
+copy .env.example .env
+```
+
+Основные переменные:
+
+```env
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=127.0.0.1
+DB_PORT=5433
+DB_NAME=reestr_pro_db
+DEBUG=True
+CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173
+LOG_LEVEL=INFO
+LOG_FILE=py_log.log
+GIGACHAT_CREDENTIALS=your_gigachat_authorization_key
+GIGACHAT_MODEL=GigaChat
+GIGACHAT_VERIFY_SSL_CERTS=False
+```
+
+Секреты должны храниться только в `.env`. Не добавляйте реальные ключи GigaChat в код, README или коммиты.
+
+### Backend
+
+Установить зависимости:
+
+```bash
+pip install -r requirements.txt
+```
+
+Запустить PostgreSQL + pgvector:
+
+```bash
+docker compose up -d
+```
+
+Применить миграции:
+
+```bash
+alembic upgrade head
+```
+
+Запустить FastAPI backend:
+
+```bash
+uvicorn backend.main:app --reload
+```
+
+Проверить health endpoints:
+
+```bash
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/health/db
+```
+
+### Демо-данные
+
+Создать тестовые архивы и загрузить демо-данные:
+
+```bash
+python -m scripts.create_test_archive
+python -m scripts.import_archive --archive backend/data/samples/archives/declaration_sample.7z --type declaration --limit 1
+python -m scripts.import_archive --archive backend/data/samples/archives/certificates_sample.7z --type certificate --limit 1
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+По умолчанию frontend обращается к backend по `http://127.0.0.1:8000`.
+
+### MCP server
+
+MCP server запускается отдельно от FastAPI:
+
+```bash
+python -m backend.mcp.server
+```
+
+Проверить создание MCP server:
+
+```bash
+python -c "from backend.mcp.server import create_mcp_server; print(type(create_mcp_server()).__name__)"
+```
+
+### Проверки
+
+```bash
+pytest -q
+python -m ruff check backend scripts tests
+python -c "import backend.main"
+python -m pip check
+```
+
+### Безопасность файлов
+
+`.env`, логи, кэши, `backend/data/raw/` и `backend/data/extracted/` не должны попадать в Git. Это контролируется `.gitignore`.

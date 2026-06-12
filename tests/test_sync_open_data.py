@@ -45,6 +45,8 @@ def test_build_batch_report_copies_batch_fields_to_plain_dict() -> None:
         "status": "completed",
         "total_rows": 10,
         "processed_rows": 8,
+        "added_rows": None,
+        "duplicate_rows": None,
         "failed_rows": 2,
         "error_message": None,
     }
