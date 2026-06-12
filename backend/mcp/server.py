@@ -1,24 +1,31 @@
-from backend.mcp.tools import get_document_card, search_registry
+from __future__ import annotations
+
+from typing import Any
+
+from backend.mcp.tools import ask_registry, get_document_card, search_registry
+
+
+def create_mcp_server() -> Any:
+    try:
+        from mcp.server.fastmcp import FastMCP
+    except ImportError as exc:
+        raise RuntimeError(
+            "MCP SDK is not installed. Install project requirements first: "
+            "pip install -r requirements.txt"
+        ) from exc
+
+    server = FastMCP("ReestrPro")
+
+    server.tool()(search_registry)
+    server.tool()(get_document_card)
+    server.tool()(ask_registry)
+
+    return server
 
 
 def main() -> None:
-    print("MCP tools dev check")
-
-    search_result = search_registry(
-        query="детская одежда",
-        limit=5,
-    )
-
-    print("Search registry result:")
-    print(search_result)
-
-    if search_result["items"]:
-        document_id = search_result["items"][0]["id"]
-
-        card_result = get_document_card(document_id=document_id)
-
-        print("Document card result:")
-        print(card_result)
+    server = create_mcp_server()
+    server.run()
 
 
 if __name__ == "__main__":
