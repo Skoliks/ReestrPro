@@ -547,3 +547,88 @@ python -m pip check
 ### Безопасность файлов
 
 `.env`, логи, кэши, `backend/data/raw/` и `backend/data/extracted/` не должны попадать в Git. Это контролируется `.gitignore`.
+
+## Production запуск на VPS
+
+Production-вариант запуска находится в [`docker-compose.prod.yml`](docker-compose.prod.yml). Он поднимает PostgreSQL с pgvector, FastAPI backend и frontend на nginx. Наружу открывается только порт `80`; backend доступен внутри Docker-сети и проксируется через `/api`.
+
+### Подготовка окружения
+
+Скопировать пример production-настроек:
+
+```bash
+cp .env.production.example .env
+```
+
+На Windows PowerShell:
+
+```powershell
+Copy-Item .env.production.example .env
+```
+
+После копирования нужно заменить `DB_PASSWORD`, `GIGACHAT_CREDENTIALS` и `CORS_ALLOWED_ORIGINS` на реальные значения VPS. Для запуска через compose backend внутри контейнеров использует `DB_HOST=db` и `DB_PORT=5432`.
+
+### Запуск
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+### Применение миграций
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+```
+
+### Загрузка демо-данных
+
+Если sample-архивы уже есть в `backend/data/samples/archives`, можно загрузить по одной записи каждого типа:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend python -m scripts.import_archive --archive backend/data/samples/archives/declaration_sample.7z --type declaration --limit 1
+docker compose -f docker-compose.prod.yml exec backend python -m scripts.import_archive --archive backend/data/samples/archives/certificates_sample.7z --type certificate --limit 1
+```
+
+Если sample-архивов нет, сначала создать их:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend python -m scripts.create_test_archive
+```
+
+### Логи и остановка
+
+Посмотреть логи всех сервисов:
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f
+```
+
+Посмотреть логи backend:
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f backend
+```
+
+Остановить контейнеры без удаления данных PostgreSQL:
+
+```bash
+docker compose -f docker-compose.prod.yml down
+```
+
+Удалять volume с базой данных нужно только осознанно:
+
+```bash
+docker compose -f docker-compose.prod.yml down -v
+```
+
+### Production-порты
+
+- `80:80` — frontend nginx и proxy `/api` на backend.
+- `8000` — backend открыт только внутри Docker-сети.
+- `5432` — PostgreSQL открыт только внутри Docker-сети.
+
+MCP не запускается отдельным production-сервисом. Его можно запускать вручную внутри backend-контейнера только при необходимости:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend python -m backend.mcp.server
+```

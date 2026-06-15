@@ -4,11 +4,14 @@ PROJECT_CONTEXT.md
 TASKS.md
 ОТЧЕТ_О_ВЫПОЛНЕНИИ.md
 ITERATIONs.md
+final.md
+deploy.md
 
 # Environment files
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # Logs
 *.log
