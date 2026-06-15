@@ -36,7 +36,6 @@ htmlcov/
 
 # Build and packaging
 build/
-dist/
 site/
 .eggs/
 *.egg
